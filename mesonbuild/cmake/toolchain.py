@@ -88,22 +88,20 @@ class CMakeToolchain:
         so paths like C:/foo break. Convert to /c/foo form instead.
         See https://github.com/mesonbuild/meson/issues/14636
 
-        MSYSTEM being set does not imply MSYS2 cmake is in use (native Windows
-        cmake may appear earlier on PATH). Check the cmake binary path instead.
+        We check if cygpath.exe is in the same directory as cmake.exe.
+        This reliably distinguishes MSYS2/Cygwin POSIX cmake from native
+        Windows cmake (like MinGW/UCRT cmake or official CMake), as the
+        former resides in /usr/bin or /bin alongside cygpath.
         """
         if is_cygwin():
             return True
         if not is_windows():
             return False
-        path = cmakebin.executable_path().replace('\\', '/').lower()
-        # MSYSTEM_PREFIX is a unix-style path like /ucrt64; check whether
-        # it appears as a component in the cmake binary's resolved path.
-        prefix = os.environ.get('MSYSTEM_PREFIX', '').replace('\\', '/').lower().rstrip('/')
-        if prefix and f'{prefix}/' in path:
+        
+        cmake_dir = os.path.dirname(cmakebin.executable_path())
+        if os.path.exists(os.path.join(cmake_dir, 'cygpath.exe')):
             return True
-        return any(x in path for x in (
-            '/msys64/', '/ucrt64/', '/clang64/', '/clangarm64/',
-            '/mingw64/', '/mingw32/'))
+        return False
 
     @staticmethod
     def _to_cmake_unix_path(path: str, cygpath_bin: T.Optional[str]) -> str:

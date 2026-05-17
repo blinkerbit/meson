@@ -2225,28 +2225,23 @@ class InternalTests(unittest.TestCase):
 
     @mock.patch('mesonbuild.cmake.toolchain.is_windows', return_value=True)
     @mock.patch('mesonbuild.cmake.toolchain.is_cygwin', return_value=False)
-    def test_cmake_toolchain_needs_unix_paths_msys2(self, *_: mock.Mock) -> None:
+    @mock.patch('os.path.exists')
+    def test_cmake_toolchain_needs_unix_paths_msys2(self, mock_exists: mock.Mock, *_: mock.Mock) -> None:
         cmakebin = mock.Mock()
-        for path in (
-            'C:/msys64/ucrt64/bin/cmake.exe',
-            'C:/prefix/mingw64/bin/cmake.exe',
-        ):
-            with self.subTest(path):
-                cmakebin.executable_path.return_value = path
-                self.assertTrue(CMakeToolchain._cmake_needs_unix_paths(cmakebin))
-        # Non-standard MSYS2 install detected via MSYSTEM_PREFIX
-        with self.subTest('MSYSTEM_PREFIX fallback'):
-            cmakebin.executable_path.return_value = 'D:/tools/msys/custom64/bin/cmake.exe'
-            with mock.patch.dict(os.environ, {'MSYSTEM_PREFIX': '/custom64'}):
-                self.assertTrue(CMakeToolchain._cmake_needs_unix_paths(cmakebin))
+        cmakebin.executable_path.return_value = 'C:/msys64/usr/bin/cmake.exe'
+        mock_exists.return_value = True
+        self.assertTrue(CMakeToolchain._cmake_needs_unix_paths(cmakebin))
+        mock_exists.assert_called_with(os.path.join('C:/msys64/usr/bin', 'cygpath.exe'))
 
     @mock.patch('mesonbuild.cmake.toolchain.is_windows', return_value=True)
     @mock.patch('mesonbuild.cmake.toolchain.is_cygwin', return_value=False)
-    def test_cmake_toolchain_needs_unix_paths_native_win(self, *_: mock.Mock) -> None:
+    @mock.patch('os.path.exists')
+    def test_cmake_toolchain_needs_unix_paths_native_win(self, mock_exists: mock.Mock, *_: mock.Mock) -> None:
         cmakebin = mock.Mock()
-        cmakebin.executable_path.return_value = 'C:/Program Files/CMake/bin/cmake.exe'
-        with mock.patch.dict(os.environ, {'MSYSTEM': 'UCRT64', 'MSYSTEM_PREFIX': '/ucrt64'}):
-            self.assertFalse(CMakeToolchain._cmake_needs_unix_paths(cmakebin))
+        cmakebin.executable_path.return_value = 'C:/msys64/mingw64/bin/cmake.exe'
+        mock_exists.return_value = False
+        self.assertFalse(CMakeToolchain._cmake_needs_unix_paths(cmakebin))
+        mock_exists.assert_called_with(os.path.join('C:/msys64/mingw64/bin', 'cygpath.exe'))
 
     @mock.patch('mesonbuild.cmake.toolchain.is_windows', return_value=False)
     @mock.patch('mesonbuild.cmake.toolchain.is_cygwin', return_value=True)
